@@ -12,15 +12,15 @@ import asyncio
 import json
 
 PREFIX = ">"
-BOT_VERSION = "V.RS.21"
-BOT_CERT = "USRS2250ILMP1826"
+BOT_VERSION = "V.RS.22.GH.OL"
+BOT_CERT = "USRS2250ILMP6482"
 AUTHORIZED_IDS = {949748857351340062, 479990917110038529}
 
 BOT_FILE = os.path.abspath(__file__)
 CRED_FILE = "credentials.json"
 UPDATE_FLAG = "update_flag.txt"
 STABLE_BACKUP = BOT_FILE.replace(".py", "_backup.py")
-GITHUB_UPFW = "https://raw.githubusercontent.com/YOURNAME/YOURREPO/main/UPFW.py"
+GITHUB_UPFW = "https://github.com/Birb02/firmwareupdate/blob/main/UPFW.py"
 
 # Load credentials if they exist
 TOKEN = None
