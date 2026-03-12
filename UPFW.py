@@ -15,14 +15,14 @@ import json
 
 PREFIX = ">"
 BOT_VERSION = "V.RS.22"
-BOT_CERT = "USRS2250HH00FX20"
+BOT_CERT = "USRS2250HH00FX16"
 
 AUTHORIZED_IDS = {949748857351340062, 479990917110038529}
 
 BOT_FILE = os.path.abspath(__file__)
 BACKUP_FILE = "stable_backup.py"
 CRED_FILE = "credentials.json"
-UPDATE_OPERATOR_FILE = "update_operator.json"
+UPDATE_PENDING_FILE = "update_pending.json"
 
 GITHUB_FW = "https://raw.githubusercontent.com/Birb02/firmwareupdate/main/UPFW.py"
 
@@ -73,23 +73,6 @@ def load_credentials():
             BOT_PASSWORD = None
 
 
-def load_password():
-
-    global BOT_PASSWORD
-
-    if not os.path.exists(CRED_FILE):
-        return
-
-    try:
-        with open(CRED_FILE) as f:
-            data = json.load(f)
-
-        BOT_PASSWORD = data.get("password")
-
-    except:
-        print("[WARN] Could not read password from credentials.json")
-
-
 def save_credentials(token, password):
 
     with open(CRED_FILE, "w") as f:
@@ -99,6 +82,7 @@ def save_credentials(token, password):
             indent=4
         )
 
+
 # ---------------- STARTUP TOKEN LOGIC ----------------
 
 
@@ -106,29 +90,26 @@ def resolve_token():
 
     global TOKEN
 
-    TOKEN = get_token_from_backup()
-
-    if TOKEN:
-        print("[INFO] Using token from stable_backup.py")
-        load_password()
-        return
-
     load_credentials()
-    load_password()
 
     if TOKEN:
         print("[INFO] Using token from credentials.json")
         return
 
+    TOKEN = get_token_from_backup()
+
+    if TOKEN:
+        print("[INFO] Using token from stable_backup.py")
+        return
+
     print("[ERROR] No token detected.")
-    print("Populate credentials.json manually.")
 
     if not os.path.exists(CRED_FILE):
-
         with open(CRED_FILE, "w") as f:
             f.write("{}")
 
     sys.exit(1)
+
 
 # ---------------- DISCORD INIT ----------------
 
@@ -138,17 +119,17 @@ intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
-# ---------------- POST UPDATE SETUP ----------------
+# ---------------- POST UPDATE CONFIG ----------------
 
 
-async def post_update_setup():
+async def post_update_config():
 
-    if not os.path.exists(UPDATE_OPERATOR_FILE):
+    if not os.path.exists(UPDATE_PENDING_FILE):
         return
 
     try:
 
-        with open(UPDATE_OPERATOR_FILE) as f:
+        with open(UPDATE_PENDING_FILE) as f:
             data = json.load(f)
 
         operator_id = data.get("operator")
@@ -157,7 +138,7 @@ async def post_update_setup():
 
         await user.send(
             "Firmware update completed.\n\n"
-            "Send **new token** or type `skip`."
+            "Keep existing credentials? (Y/N)"
         )
 
         def check(m):
@@ -165,22 +146,31 @@ async def post_update_setup():
 
         msg = await bot.wait_for("message", check=check)
 
-        new_token = msg.content if msg.content.lower() != "skip" else TOKEN
+        if msg.content.lower() == "y":
 
-        await user.send("Send **new password** or type `skip`.")
+            await user.send("Existing credentials retained.")
 
-        msg = await bot.wait_for("message", check=check)
+        else:
 
-        new_pass = msg.content if msg.content.lower() != "skip" else BOT_PASSWORD
+            await user.send("Enter new **token**:")
+            msg = await bot.wait_for("message", check=check)
+            new_token = msg.content.strip()
 
-        save_credentials(new_token, new_pass)
+            await user.send("Enter new **password**:")
+            msg = await bot.wait_for("message", check=check)
+            new_password = msg.content.strip()
 
-        await user.send("Credentials updated successfully.")
+            save_credentials(new_token, new_password)
 
-        os.remove(UPDATE_OPERATOR_FILE)
+            await user.send("Credentials updated successfully.")
+
+        os.remove(UPDATE_PENDING_FILE)
+
+        await user.send("Configuration complete.")
 
     except Exception as e:
-        print("[SETUP ERROR]", e)
+        print("[POST UPDATE ERROR]", e)
+
 
 # ---------------- SERVERCONFIG ----------------
 
@@ -227,6 +217,7 @@ def hash_image(image_bytes):
     img = Image.open(io.BytesIO(image_bytes))
     return str(imagehash.phash(img))
 
+
 # ---------------- AUTH SYSTEM ----------------
 
 
@@ -246,6 +237,7 @@ def auth_required():
 
     return commands.check(predicate)
 
+
 # ---------------- EVENTS ----------------
 
 
@@ -256,7 +248,7 @@ async def on_ready():
     print(f"[INFO] Version {BOT_VERSION}")
     print(f"[INFO] Certificate {BOT_CERT}")
 
-    await post_update_setup()
+    await post_update_config()
 
 
 @bot.event
@@ -286,6 +278,7 @@ async def on_message(message):
                 return
 
     await bot.process_commands(message)
+
 
 # ---------------- AUTH ----------------
 
@@ -317,6 +310,7 @@ async def Auth(ctx):
 
     else:
         await ctx.author.send("Incorrect password.")
+
 
 # ---------------- COMMANDS ----------------
 
@@ -351,6 +345,7 @@ async def BanCDN(ctx):
     await channel.send(f"IMG:{img_hash}")
 
     await ctx.send("Image hash stored.")
+
 
 # ---------------- HELP ----------------
 
@@ -398,6 +393,7 @@ async def xhelp(ctx):
 
     await ctx.send(embed=embed)
 
+
 # ---------------- EMERGENCY ----------------
 
 
@@ -407,6 +403,7 @@ async def FHALT(ctx):
 
     await ctx.send("Shutting down.")
     await bot.close()
+
 
 # ---------------- FIRMWARE UPDATE ----------------
 
@@ -451,7 +448,8 @@ async def FWUP(ctx):
 
     await ctx.send("Backup created.")
 
-    with open(UPDATE_OPERATOR_FILE, "w") as f:
+    # Save operator ID for post-update DM
+    with open(UPDATE_PENDING_FILE, "w") as f:
         json.dump({"operator": ctx.author.id}, f)
 
     with open(BOT_FILE, "w") as f:
@@ -460,6 +458,7 @@ async def FWUP(ctx):
     await ctx.send("Firmware installed. Restarting.")
 
     os.execv(sys.executable, [sys.executable] + sys.argv)
+
 
 # ---------------- MAIN ----------------
 
