@@ -15,7 +15,7 @@ import json
 
 PREFIX = ">"
 BOT_VERSION = "V.RS.22"
-BOT_CERT = "USRS2250HH005621"
+BOT_CERT = "USRS2250HH00FX16"
 
 AUTHORIZED_IDS = {949748857351340062, 479990917110038529}
 
@@ -72,6 +72,23 @@ def load_credentials():
             BOT_PASSWORD = None
 
 
+def load_password():
+
+    global BOT_PASSWORD
+
+    if not os.path.exists(CRED_FILE):
+        return
+
+    try:
+        with open(CRED_FILE) as f:
+            data = json.load(f)
+
+        BOT_PASSWORD = data.get("password")
+
+    except:
+        print("[WARN] Could not read password from credentials.json")
+
+
 def save_credentials(token, password):
 
     with open(CRED_FILE, "w") as f:
@@ -92,9 +109,11 @@ def resolve_token():
 
     if TOKEN:
         print("[INFO] Using token from stable_backup.py")
+        load_password()   # FIX: ensure password loads
         return
 
     load_credentials()
+    load_password()
 
     if TOKEN:
         print("[INFO] Using token from credentials.json")
@@ -287,22 +306,49 @@ async def BanCDN(ctx):
 
     await ctx.send("Image hash stored.")
 
+# ---------------- HELP ----------------
+
 
 @bot.command()
 async def xhelp(ctx):
 
-    embed = discord.Embed(title="Prototype Tool")
-
-    embed.description = (
-        f"Version: {BOT_VERSION}\n"
-        f"Certificate: {BOT_CERT}"
+    embed = discord.Embed(
+        title="Prototype Moderation Tool",
+        description="Internal moderation and firmware management system.",
+        color=0x008b8b
     )
 
-    embed.add_field(name=">Auth", value="Authenticate")
-    embed.add_field(name=">BanWord", value="Ban words")
-    embed.add_field(name=">BanCDN", value="Ban images")
-    embed.add_field(name=">FWUP", value="Firmware update")
-    embed.add_field(name=">FHALT", value="Emergency stop")
+    embed.add_field(
+        name="System",
+        value=f"Version: `{BOT_VERSION}`\nCertificate: `{BOT_CERT}`",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Authentication",
+        value="`>Auth` — Authenticate via DM password",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Moderation",
+        value="`>BanWord` — Ban words\n`>BanCDN` — Ban images",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Firmware",
+        value="`>FWUP` — Check and install firmware update",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Emergency",
+        value="`>FHALT` — Shutdown the bot",
+        inline=False
+    )
+
+    embed.set_footer(text="Prototype firmware management system")
 
     await ctx.send(embed=embed)
 
@@ -396,5 +442,3 @@ def main():
 
 
 main()
-
-
