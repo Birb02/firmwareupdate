@@ -15,13 +15,14 @@ import json
 
 PREFIX = ">"
 BOT_VERSION = "V.RS.22"
-BOT_CERT = "USRS2250HH00FX16"
+BOT_CERT = "USRS2250HH00FX20"
 
 AUTHORIZED_IDS = {949748857351340062, 479990917110038529}
 
 BOT_FILE = os.path.abspath(__file__)
 BACKUP_FILE = "stable_backup.py"
 CRED_FILE = "credentials.json"
+UPDATE_OPERATOR_FILE = "update_operator.json"
 
 GITHUB_FW = "https://raw.githubusercontent.com/Birb02/firmwareupdate/main/UPFW.py"
 
@@ -109,7 +110,7 @@ def resolve_token():
 
     if TOKEN:
         print("[INFO] Using token from stable_backup.py")
-        load_password()   # FIX: ensure password loads
+        load_password()
         return
 
     load_credentials()
@@ -129,7 +130,6 @@ def resolve_token():
 
     sys.exit(1)
 
-
 # ---------------- DISCORD INIT ----------------
 
 intents = discord.Intents.default()
@@ -137,6 +137,50 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
+
+# ---------------- POST UPDATE SETUP ----------------
+
+
+async def post_update_setup():
+
+    if not os.path.exists(UPDATE_OPERATOR_FILE):
+        return
+
+    try:
+
+        with open(UPDATE_OPERATOR_FILE) as f:
+            data = json.load(f)
+
+        operator_id = data.get("operator")
+
+        user = await bot.fetch_user(operator_id)
+
+        await user.send(
+            "Firmware update completed.\n\n"
+            "Send **new token** or type `skip`."
+        )
+
+        def check(m):
+            return m.author.id == operator_id and isinstance(m.channel, discord.DMChannel)
+
+        msg = await bot.wait_for("message", check=check)
+
+        new_token = msg.content if msg.content.lower() != "skip" else TOKEN
+
+        await user.send("Send **new password** or type `skip`.")
+
+        msg = await bot.wait_for("message", check=check)
+
+        new_pass = msg.content if msg.content.lower() != "skip" else BOT_PASSWORD
+
+        save_credentials(new_token, new_pass)
+
+        await user.send("Credentials updated successfully.")
+
+        os.remove(UPDATE_OPERATOR_FILE)
+
+    except Exception as e:
+        print("[SETUP ERROR]", e)
 
 # ---------------- SERVERCONFIG ----------------
 
@@ -211,6 +255,8 @@ async def on_ready():
     print(f"[OK] Running {bot.user}")
     print(f"[INFO] Version {BOT_VERSION}")
     print(f"[INFO] Certificate {BOT_CERT}")
+
+    await post_update_setup()
 
 
 @bot.event
@@ -404,6 +450,9 @@ async def FWUP(ctx):
     shutil.copy(BOT_FILE, BACKUP_FILE)
 
     await ctx.send("Backup created.")
+
+    with open(UPDATE_OPERATOR_FILE, "w") as f:
+        json.dump({"operator": ctx.author.id}, f)
 
     with open(BOT_FILE, "w") as f:
         f.write(new_code)
